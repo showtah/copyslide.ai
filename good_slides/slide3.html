@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>近年のバッテリー価格の推移</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome は現在使用されていません。将来的に使用予定がなければ削除可能です -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.4"></script>
+    <style>
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+        .slide-container {
+            width: 1280px;
+            min-height: 720px;
+            margin: 20px auto;
+            background-color: white;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+        /* SVGトレンドラインとdivアノテーションは、グラフのデータ座標系ではなくパーセンテージで配置されています。 */
+        /* グラフのデータ範囲やスケールが大きく変わった場合、手動での調整が必要になることがあります。 */
+        /* より堅牢なアノテーションには chartjs-plugin-annotation のようなプラグインの利用を検討できます。 */
+        .trend-line {
+            position: absolute;
+            pointer-events: none;
+        }
+        .chart-container {
+            position: relative;
+        }
+        .annotation-oval {
+            border: 2px solid;
+            border-radius: 50%;
+            background-color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: absolute;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="slide-container">
+        <!-- Header Section -->
+        <header class="px-12 pt-6 pb-4">
+            <!-- Sub Title -->
+            <div class="mb-2">
+                <h2 class="text-2xl font-medium text-gray-800">2. TESLAのバリューチェンから見た競争優位の"源泉"</h2>
+            </div>
+            
+            <!-- Main Title with Header Tags -->
+            <div class="flex justify-between items-center mb-6">
+                <h1 class="text-4xl font-bold text-gray-900">近年のバッテリー価格の推移</h1>
+                
+                <!-- Header Tags -->
+                <div class="flex space-x-2">
+                    <span class="px-3 py-2 text-sm font-medium bg-gray-100 text-gray-700 rounded-md">企画</span>
+                    <span class="px-3 py-2 text-sm font-medium bg-purple-600 text-white rounded-md">開発</span>
+                    <span class="px-3 py-2 text-sm font-medium bg-gray-100 text-gray-700 rounded-md">調達</span>
+                    <span class="px-3 py-2 text-sm font-medium bg-gray-100 text-gray-700 rounded-md">製造</span>
+                    <span class="px-3 py-2 text-sm font-medium bg-gray-100 text-gray-700 rounded-md">販売</span>
+                    <span class="px-3 py-2 text-sm font-medium bg-gray-100 text-gray-700 rounded-md">アフターサポート</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-grow px-12">
+            <!-- Description -->
+            <div class="mb-8">
+                <p class="text-lg text-gray-700 leading-relaxed">
+                    電気自動車の普及に伴いKwhあたりのバッテリーコストは低下してきたが、足元は下げ止まり傾向にあり。今後バッテリー需要の逼迫により、バッテリーの供給量確保と低価格が自動車メーカーにとって急務となっている
+                </p>
+            </div>
+            
+            <!-- Chart Section -->
+            <div class="relative">
+                <!-- Chart Title -->
+                <div class="text-center mb-4">
+                    <h3 class="text-xl font-semibold text-gray-800">米国における新車EV/PHEV1台当りバッテリーコスト</h3>
+                    <p class="text-sm text-gray-600 mt-1">単位：USD/台</p>
+                </div>
+                
+                <!-- Chart Container -->
+                <div class="chart-container relative" style="height: 400px;">
+                    <canvas id="batteryChart" style="width: 100%; height: 100%;"></canvas>
+                    
+                    <!-- Trend Lines (SVG overlay) -->
+                    <svg class="absolute top-0 left-0 w-full h-full pointer-events-none" style="z-index: 10;">
+                        <!-- First trend line (black) -->
+                        <line x1="14%" y1="82%" x2="42%" y2="65%" stroke="black" stroke-width="2" stroke-dasharray="5,5"/>
+                        <line x1="42%" y1="65%" x2="58%" y2="45%" stroke="black" stroke-width="2" stroke-dasharray="5,5"/>
+                        
+                        <!-- Second trend line (purple) -->
+                        <line x1="58%" y1="45%" x2="72%" y2="48%" stroke="#7C3AED" stroke-width="2" stroke-dasharray="5,5"/>
+                        <line x1="72%" y1="48%" x2="86%" y2="46%" stroke="#7C3AED" stroke-width="2" stroke-dasharray="5,5"/>
+                    </svg>
+                    
+                    <!-- Annotations -->
+                    <div class="annotation-oval" style="top: 28%; left: 40%; width: 50px; height: 30px; border-color: black; font-size: 14px;">-19%</div>
+                    <div class="annotation-oval" style="top: 35%; left: 70%; width: 45px; height: 30px; border-color: #7C3AED; font-size: 14px;">+3%</div>
+                    
+                    <!-- Chart Note -->
+                    <div class="absolute" style="top: 25%; right: 5%; max-width: 300px;">
+                        <p class="text-lg font-medium text-purple-600 bg-white p-3 rounded-lg shadow-md border border-purple-200">
+                            足下数年の1台当りバッテリーコストは下げ止まりしている
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="px-12 py-4 mt-8">
+            <div class="flex justify-between items-end">
+                <div class="flex-grow">
+                    <p class="text-xs text-gray-600">
+                        出所：新車EV/PHEVバッテリー総容量(米エネルギー省)、EV/PHEV新車販売台数(IEA Global EV Outlook)、kWh当りバッテリー価格(Bloomberg NEF)より推計
+                    </p>
+                    <p class="text-xs text-gray-500 mt-2">\n                        Copyright © 2021 Accenture. All rights reserved.\n                    </p>
+                </div>
+                <div class="ml-4">
+                    <span class="text-sm font-medium text-gray-700">19</span>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        // Chart.js configuration
+        const ctx = document.getElementById('batteryChart').getContext('2d');
+        
+        const chartData = {
+            labels: ['2013', '2014', '2015', '2016', '2017', '2018', '2019'],
+            datasets: [
+                {
+                    label: 'バッテリーセル',
+                    data: [13262, 10178, 8351, 8082, 5861, 6656, 6230],
+                    backgroundColor: '#A855F7', // purple-500
+                    borderWidth: 0,
+                    stack: 'battery'
+                },
+                {
+                    label: 'バッテリーパック',
+                    data: [6081, 4799, 4127, 3007, 2458, 2560, 2662],
+                    backgroundColor: '#EC4899', // pink-500
+                    borderWidth: 0,
+                    stack: 'battery'
+                }
+            ]
+        };
+        
+        const chartOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                xAxes: [{
+                    stacked: true,
+                    gridLines: {
+                        display: false
+                    },
+                    ticks: {
+                        fontSize: 14,
+                        fontFamily: 'Noto Sans JP'
+                    }
+                }],
+                yAxes: [{
+                    stacked: true,
+                    gridLines: {
+                        color: '#E5E7EB',
+                        zeroLineColor: '#E5E7EB'
+                    },
+                    ticks: {
+                        beginAtZero: true,
+                        max: 20000, // データの最大値に応じて調整
+                        stepSize: 5000,
+                        fontSize: 12,
+                        fontFamily: 'Noto Sans JP',
+                        callback: function(value) {
+                            return value.toLocaleString();
+                        }
+                    }
+                }]
+            },
+            legend: {
+                position: 'left', // 凡例を左に配置
+                labels: {
+                    fontSize: 14,
+                    fontFamily: 'Noto Sans JP',
+                    usePointStyle: true,
+                    padding: 20
+                }
+            },
+            tooltips: {
+                mode: 'index',
+                intersect: false,
+                callbacks: {
+                    label: function(tooltipItem, data) {
+                        const datasetLabel = data.datasets[tooltipItem.datasetIndex].label;
+                        const value = tooltipItem.yLabel.toLocaleString();
+                        return datasetLabel + ': ' + value + ' USD';
+                    },
+                    footer: function(tooltipItems) {
+                        let total = 0;
+                        tooltipItems.forEach(function(tooltipItem) {
+                            total += tooltipItem.yLabel;
+                        });
+                        return '合計: ' + total.toLocaleString() + ' USD';
+                    }
+                }
+            },
+            plugins: { // Chart.js v2では plugins オプションはトップレベルにはありません。
+                       // datalabels: false は、chartjs-plugin-datalabels を使用している場合の設定です。
+                       // 今回はカスタムプラグインでラベルを描画するため、この設定は不要です。
+            },
+            animation: {
+                duration: 1000,
+                easing: 'easeInOutQuart'
+                // onComplete はカスタムプラグインに置き換えるため削除
+            }
+        };
+        
+        // Custom plugin to draw total sum labels on top of stacked bars
+        const totalSumLabelsPlugin = {
+            id: 'totalSumLabels',
+            afterDatasetsDraw: function(chart) {
+                const ctx = chart.ctx;
+                ctx.save(); // Save context state before drawing
+
+                // フォント設定 (Chart.js v2.x のヘルパーを使用)
+                ctx.font = Chart.helpers.fontString(12, 'normal', 'Noto Sans JP');
+                ctx.fillStyle = chart.options.scales.yAxes[0].ticks.fontColor || '#374151'; // Y軸の文字色に合わせるか、デフォルト色
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'bottom'; // テキストをバーの上端から少し上に配置するための基準
+
+                let lastStackedDatasetIndex = -1;
+                // 'battery' スタックの最後のデータセットのインデックスを見つける
+                for (let i = chart.data.datasets.length - 1; i >= 0; i--) {
+                    if (chart.data.datasets[i].stack === 'battery') {
+                        lastStackedDatasetIndex = i;
+                        break;
+                    }
+                }
+
+                if (lastStackedDatasetIndex === -1) {
+                    ctx.restore(); // No datasets found for this stack
+                    return;
+                }
+                
+                const topDatasetMeta = chart.getDatasetMeta(lastStackedDatasetIndex);
+
+                topDatasetMeta.data.forEach((bar, index) => {
+                    let total = 0;
+                    chart.data.datasets.forEach(function(dataset, i) {
+                        // 表示されていて、同じスタックに属するデータセットの値を合計
+                        if (dataset.stack === 'battery' && dataset.data[index] !== undefined && !chart.getDatasetMeta(i).hidden) {
+                            total += dataset.data[index];
+                        }
+                    });
+
+                    // bar._model は v2.x で要素の描画情報を保持します
+                    if (total > 0 && bar._model && !bar.hidden) { 
+                        const x = bar._model.x;
+                        const y = bar._model.y; // y はスタックされたバーの最上部のセグメントの上端
+                        
+                        // ラベルがチャートエリア外に出ないように簡単なチェック
+                        if (y - 5 > chart.chartArea.top + 5) { // 上端から5px、最低でもチャートエリア上部から5pxの位置に
+                           ctx.fillText(total.toLocaleString(), x, y - 5); // バーの上端から5px上にテキストを描画
+                        } else {
+                           // バーが非常に高い場合、バーの内側上部に描画することも検討できる
+                           // ctx.textBaseline = 'top';
+                           // ctx.fillText(total.toLocaleString(), x, y + 5); 
+                        }
+                    }
+                });
+                ctx.restore(); // Restore context state
+            }
+        };
+
+        // Register the plugin globally
+        Chart.plugins.register(totalSumLabelsPlugin);
+        
+        const batteryChart = new Chart(ctx, {
+            type: 'bar',
+            data: chartData,
+            options: chartOptions
+        });
+        
+        // 元の onComplete でのラベル描画ロジックは削除しました。
+        // プラグインが代わりに処理を行います。
+    </script>
+</body>
+</html>
