@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TESLAのバッテリー開発体制</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-accent: #9333ea;
+            --secondary-accent: #c084fc;
+            --text-on-primary: white;
+            --default-text: black;
+            --border-light: #d1d5db;
+            --border-dark: black;
+            --grey: #6b7280;
+            --text-gray-700: #374151;
+            --text-gray-600: #4B5563;
+            --background_f3f4f6: #f3f4f6;
+            --organization_box_bg: #f8fafc;
+            --other_hires_bg: #e5e7eb;
+            --other_hires_text: #374151;
+            --main-font: 'Noto Sans JP', sans-serif;
+        }
+        body {
+            font-family: var(--main-font);
+            background-color: var(--background_f3f4f6);
+            color: var(--default-text);
+        }
+        .slide-container {
+            width: 1280px;
+            min-height: 720px;
+            margin: 20px auto;
+            background-color: white;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+        .header-tag {
+            padding: 4px 8px;
+            border-radius: 4px;
+            border: 1px solid var(--border-light);
+            background-color: white;
+            color: var(--text-gray-700);
+            font-size: 0.75rem; /* text-xs */
+            line-height: 1rem;
+        }
+        .header-tag.highlighted {
+            background-color: var(--primary-accent);
+            color: var(--text-on-primary);
+            border-color: var(--primary-accent);
+        }
+        .organization-box {
+            background-color: var(--organization_box_bg);
+            border: 1px solid var(--border-light);
+            padding: 8px 12px;
+            text-align: center;
+            border-radius: 4px;
+        }
+        .vertical-label {
+            writing-mode: vertical-rl;
+            transform: rotate(180deg);
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding-right: 8px;
+            border-right: 1px solid var(--border_light);
+            margin-right: 16px;
+            font-weight: 600; /* semibold */
+        }
+        .content-block {
+            padding-bottom: 16px;
+            margin-bottom: 16px;
+            border-bottom: 1px solid var(--border_light);
+        }
+        .content-block.no-bottom-border {
+            border-bottom: none;
+            margin-bottom: 0; /* Or adjust as needed */
+        }
+        .button-primary {
+            background-color: var(--primary-accent);
+            color: var(--text-on-primary);
+            padding: 6px 16px;
+            border-radius: 4px;
+            display: inline-block;
+            text-align: center;
+            font-weight: bold;
+            font-size: 0.875rem; /* text-sm or base, adjust as per visual */
+            line-height: 1.25rem;
+        }
+        .y-axis-label {
+            writing-mode: vertical-rl;
+            transform: rotate(180deg);
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+        }
+        .bar-segment {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden; /* To prevent text from spilling out */
+            font-size: 10px; /* for chart_segment_value */
+            line-height: 1;
+        }
+        .bar-segment.battery-engineer {
+            background-color: var(--primary-accent);
+            color: var(--text-on-primary);
+        }
+        .bar-segment.other-battery-related {
+            background-color: var(--secondary-accent);
+            color: var(--text-on-primary);
+        }
+        .bar-segment.other-hires {
+            background-color: var(--other_hires_bg);
+            color: var(--other_hires_text);
+            border: 1px solid var(--border_light); /* Added for consistency with legend */
+        }
+    </style>
+</head>
+<body>
+    <div class="slide-container">
+        <!-- Header -->
+        <header class="px-8 pt-6 pb-4">
+            <div class="flex justify-between items-start mb-3">
+                <div class="flex-grow pr-8">
+                    <h2 class="text-2xl font-bold text-black mb-1">2. TESLAのバリューチェンから見た競争優位の"源泉"</h2>
+                    <h1 class="text-4xl font-bold text-black">TESLAのバッテリー開発体制</h1>
+                </div>
+                <div class="flex-shrink-0">
+                    <div class="flex flex-wrap gap-2 justify-end">
+                        <span class="header-tag">企画</span>
+                        <span class="header-tag highlighted">開発</span>
+                        <span class="header-tag">調達</span>
+                        <span class="header-tag">製造</span>
+                        <span class="header-tag">販売</span>
+                        <span class="header-tag">アフターサポート</span>
+                    </div>
+                </div>
+            </div>
+            <p class="text-lg text-gray-700">大学との共同研究やM&Aによる技術を獲得し、バッテリー人材を積極的に採用することで高性能・高効率なバッテリー開発体制を構築している</p>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-1 px-8 py-4">
+            <div class="grid grid-cols-2 gap-8 h-full">
+                <!-- Left Column -->
+                <div id="left_column_dev_capability" class="flex flex-col">
+                    <h3 class="text-xl font-bold text-center mb-6 pb-2 border-b border-gray-300">バッテリー開発ケイパビリティ獲得の為の取り組み</h3>
+                    
+                    <div class="content-block flex">
+                        <div class="vertical-label text-sm text-gray-600">大学との研究契約</div>
+                        <div class="flex-1">
+                            <div class="organization-box text-base font-bold">DALHOUSIE UNIVERSITY</div>
+                            <div class="mb-3 mt-3">
+                                <h4 class="text-base font-bold mb-2" style="color: var(--primary-accent);">共同研究によるバッテリー性能の高度化・人材獲得</h4>
+                                <ul class="text-sm space-y-1 text-gray-700" style="line-height: 1.4;">
+                                    <li>- カナダ、ダルハウジー大学のリチウムイオン電池の世界的な権威であるJeff Dahn氏との研究契約を16年より締結</li>
+                                    <li>- 同氏の研究は世界中のリチウムイオン電池に採用される等、強い影響力を持つ</li>
+                                    <li>- TESLAは同研究室の卒業生の採用も行っている</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="content-block no-bottom-border flex">
+                        <div class="vertical-label text-sm text-gray-600">M&Aによる技術獲得</div>
+                        <div class="flex-1">
+                            <div class="flex space-x-4 mb-3">
+                                <div class="organization-box text-base font-bold flex-1">HIBAR</div>
+                                <div class="organization-box text-base font-bold flex-1">MAXWELL</div>
+                            </div>
+                            <div class="mb-3">
+                                <h4 class="text-base font-bold mb-2" style="color: var(--primary-accent);">買収を通じたバッテリー製造効率・性能の高度化</h4>
+                                <ul class="text-sm space-y-1 text-gray-700" style="line-height: 1.4;">
+                                    <li>- 19年、バッテリーの高速製造システムを専門とする会社であるHibar Systems Ltd.を買収</li>
+                                    <li>- 19年5月にバッテリーメーカーのMaxwell社を買収し、同社が保有するドライ電極技術を獲得</li>
+                                </ul>
+                            </div>
+                            <button class="button-primary">次頁詳細</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column -->
+                <div id="right_column_hr_initiatives" class="flex flex-col">
+                    <h3 class="text-xl font-bold text-center mb-6 pb-2 border-b border-gray-300">バッテリー関連人材採用への取り組み</h3>
+                    
+                    <div id="hp_hires_chart_section" class="mb-6">
+                        <div class="flex justify-end mb-2">
+                            <span class="text-xs text-gray-600">単位：人</span>
+                        </div>
+                        <div class="mb-4 space-y-1">
+                            <div class="flex items-center text-xs">
+                                <span class="w-3 h-3 mr-2 inline-block" style="background-color: var(--primary-accent);"></span>
+                                <span>バッテリーエンジニア(設計・ソフトウェア開発等)</span>
+                            </div>
+                            <div class="flex items-center text-xs">
+                                <span class="w-3 h-3 mr-2 inline-block" style="background-color: var(--secondary-accent);"></span>
+                                <span>その他バッテリー関連(生産、品質管理等)</span>
+                            </div>
+                            <div class="flex items-center text-xs">
+                                <span class="w-3 h-3 mr-2 inline-block" style="background-color: #e5e7eb; border: 1px solid var(--border-light);"></span>
+                                <span>その他採用職種</span>
+                            </div>
+                        </div>
+                        <div class="flex">
+                            <div class="y-axis-label text-xs text-gray-600 mr-2">各社公式HP採用人数</div>
+                            <div class="flex-1 space-y-2">
+                                <!-- Tesla -->
+                                <div class="flex items-center">
+                                    <span class="w-12 text-xs text-right mr-2">Tesla</span>
+                                    <div class="flex-1 flex h-[1.2rem]">
+                                        <div class="bar-segment other-hires" style="width: 67.7%;">153</div>
+                                        <div class="bar-segment other-battery-related" style="width: 19.9%;">45</div>
+                                        <div class="bar-segment battery-engineer" style="width: 12.4%;">28</div>
+                                    </div>
+                                    <span class="w-8 text-xs text-center ml-2">226</span>
+                                </div>
+                                <!-- トヨタ -->
+                                <div class="flex items-center">
+                                    <span class="w-12 text-xs text-right mr-2">トヨタ</span>
+                                    <div class="flex-1 flex h-[1.2rem]">
+                                        <div class="bar-segment other-hires" style="width: 42.9%;">97</div>
+                                        <div class="bar-segment other-battery-related" style="width: 0.9%;">2</div>
+                                        <div class="bar-segment battery-engineer" style="width: 2.7%;">6</div>
+                                    </div>
+                                    <span class="w-8 text-xs text-center ml-2">105</span>
+                                </div>
+                                <!-- 日産 -->
+                                <div class="flex items-center">
+                                    <span class="w-12 text-xs text-right mr-2">日産</span>
+                                    <div class="flex-1 flex h-[1.2rem]">
+                                        <div class="bar-segment other-hires" style="width: 5.3%;">12</div>
+                                        <div class="bar-segment battery-engineer" style="width: 0.4%;">1</div>
+                                    </div>
+                                    <span class="w-8 text-xs text-center ml-2">13</span>
+                                </div>
+                                <!-- ホンダ -->
+                                <div class="flex items-center">
+                                    <span class="w-12 text-xs text-right mr-2">ホンダ</span>
+                                    <div class="flex-1 flex h-[1.2rem]">
+                                        <div class="bar-segment other-hires" style="width: 19.9%;">45</div>
+                                        <div class="bar-segment other-battery-related" style="width: 0.9%;">2</div>
+                                        <div class="bar-segment battery-engineer" style="width: 0.4%;">1</div>
+                                    </div>
+                                    <span class="w-8 text-xs text-center ml-2">48</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-center mt-3">
+                            <p class="text-xs" style="color: var(--primary-accent);">TESLAと比較し日系OEMのバッテリー関連の採用は僅か</p>
+                        </div>
+                    </div>
+
+                    <div id="linkedin_chart_section">
+                        <div class="flex">
+                            <div class="y-axis-label text-xs text-gray-600 mr-2">LinkedIn登録者数</div>
+                            <div class="flex-1 space-y-2">
+                                <!-- Tesla LinkedIn -->
+                                <div class="flex items-center">
+                                    <span class="w-12 text-xs text-right mr-2">Tesla</span>
+                                    <div class="flex-1 flex items-center h-[1.2rem]">
+                                        <div class="bar-segment other-hires" style="width: 70%; min-width: 60px;">40,200 //</div>
+                                        <div class="bar-segment other-battery-related" style="width: 10%;">700</div>
+                                        <div class="bar-segment battery-engineer" style="width: 20%;">1,100</div>
+                                    </div>
+                                    <span class="w-12 text-xs text-center ml-2">42,000</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-right mt-2">
+                            <p class="text-xs text-gray-600">※従業員全体は20年12月末時点で70,757人</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="px-8 py-3 border-t border-gray-200 mt-auto">
+            <div class="grid grid-cols-12 gap-2 items-center">
+                <div class="col-span-7">
+                    <p class="text-xs" style="color: var(--grey);">出所:現状のエンジニア数はLinkedIn登録数を参照、採用人数は各社公式HPより。いずれも4/21時点</p>
+                </div>
+                <div class="col-span-4 text-right">
+                    <p class="text-xs" style="color: var(--grey);">Copyright © 2021 Accenture. All rights reserved.</p>
+                </div>
+                <div class="col-span-1 text-right">
+                    <p class="text-xs" style="color: var(--grey);">22</p>
+                </div>
+            </div>
+        </footer>
+    </div>
+</body>
+</html>

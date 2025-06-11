@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { LoadingSpinner } from './LoadingSpinner';
 import html2canvas from 'html2canvas';
@@ -87,6 +86,16 @@ const _makeComponentsEditableInternal = (win: any, currentSlideIdx: number) => {
   let editToolbar: HTMLElement | null = null;
   let chartEditButton: HTMLButtonElement | null = null;
   let chartEditModal: HTMLElement | null = null;
+  
+  // === Resize handles state ===
+  let resizeHandles: HTMLElement[] = [];
+  let isResizing = false;
+  let activeHandleDir: string | null = null; // 'n','ne',... etc.
+  let resizeStartX = 0, resizeStartY = 0;
+  let startWidth = 0, startHeight = 0, startLeft = 0, startTop = 0;
+  // ============================
+  
+  const REMOVE_CLASS = '_component_resize_handle';
 
   const eventListeners: Array<{el: EventTarget, type: string, handler: EventListenerOrEventListenerObject, options?: boolean | AddEventListenerOptions}> = [];
 
@@ -180,6 +189,20 @@ const _makeComponentsEditableInternal = (win: any, currentSlideIdx: number) => {
     ._chart_edit_modal_content .dataset-group { margin-bottom: 15px; padding: 10px; border: 1px solid #334155; border-radius: 4px; }
     ._chart_edit_modal_content .modal-actions { margin-top: 20px; text-align: right; }
     ._chart_edit_modal_content .modal-actions button { margin-left: 10px; padding: 8px 15px; }
+    .${REMOVE_CLASS} {
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      background-color: #38bdf8; /* sky-500 */
+      border: 1px solid #0ea5e9; /* sky-600 */
+      border-radius: 2px;
+      z-index: 100002;
+      cursor: pointer;
+    }
+    .${REMOVE_CLASS}[data-dir="n"], .${REMOVE_CLASS}[data-dir="s"] { cursor: ns-resize; }
+    .${REMOVE_CLASS}[data-dir="e"], .${REMOVE_CLASS}[data-dir="w"] { cursor: ew-resize; }
+    .${REMOVE_CLASS}[data-dir="ne"], .${REMOVE_CLASS}[data-dir="sw"] { cursor: nesw-resize; }
+    .${REMOVE_CLASS}[data-dir="nw"], .${REMOVE_CLASS}[data-dir="se"] { cursor: nwse-resize; }
   `;
   doc.head.appendChild(style);
 
@@ -318,6 +341,13 @@ const _makeComponentsEditableInternal = (win: any, currentSlideIdx: number) => {
     editToolbar = doc.createElement('div');
     editToolbar.className = '_component_edit_toolbar';
     
+    // Ensure toolbar is initially hidden and positioned off-screen
+    editToolbar!.style.display = 'none';
+    editToolbar!.style.visibility = 'hidden';
+    editToolbar!.style.position = 'absolute';
+    editToolbar!.style.top = '-9999px';
+    editToolbar!.style.left = '-9999px';
+    
     const deleteBtn = doc.createElement('button');
     deleteBtn.textContent = '削除';
     deleteBtn.className = 'delete-btn';
@@ -358,8 +388,8 @@ const _makeComponentsEditableInternal = (win: any, currentSlideIdx: number) => {
     chartEditButton = doc.createElement('button');
     chartEditButton.textContent = 'チャートデータ';
     chartEditButton.className = 'chart-edit-btn';
-    chartEditButton.style.display = 'none'; // Initially hidden
-    addTrackedListener(chartEditButton, 'click', (e) => {
+    chartEditButton!.style.display = 'none'; // Initially hidden
+    addTrackedListener(chartEditButton as HTMLButtonElement, 'click', (e: any) => {
         e.stopPropagation();
         if (selectedComponent && selectedComponent.tagName === 'CANVAS') {
             const chartId = selectedComponent.id;
@@ -372,12 +402,11 @@ const _makeComponentsEditableInternal = (win: any, currentSlideIdx: number) => {
         }
     });
 
-    editToolbar.appendChild(deleteBtn);
-    editToolbar.appendChild(increaseBtn);
-    editToolbar.appendChild(decreaseBtn);
-    editToolbar.appendChild(chartEditButton);
-    doc.body.appendChild(editToolbar);
-    editToolbar.style.display = 'none';
+    editToolbar!.appendChild(deleteBtn);
+    editToolbar!.appendChild(increaseBtn);
+    editToolbar!.appendChild(decreaseBtn);
+    editToolbar!.appendChild(chartEditButton as Node);
+    doc.body.appendChild(editToolbar!);
   };
 
   const positionToolbar = () => {
@@ -386,7 +415,10 @@ const _makeComponentsEditableInternal = (win: any, currentSlideIdx: number) => {
       const scrollTop = win.pageYOffset || doc.documentElement.scrollTop;
       const scrollLeft = win.pageXOffset || doc.documentElement.scrollLeft;
       
+      // Make toolbar visible
       editToolbar.style.display = 'flex';
+      editToolbar.style.visibility = 'visible';
+      
       let top = rect.top + scrollTop - editToolbar.offsetHeight - 8;
       let left = rect.left + scrollLeft;
 
@@ -404,19 +436,119 @@ const _makeComponentsEditableInternal = (win: any, currentSlideIdx: number) => {
     }
   };
 
+  // Helper to create resize handles around selected component
+  const createResizeHandles = () => {
+    if (!selectedComponent) return;
+    removeResizeHandles();
+    const dirs = ['nw','n','ne','e','se','s','sw','w'];
+    dirs.forEach(dir => {
+      const handle = doc.createElement('div');
+      handle.className = REMOVE_CLASS;
+      handle.dataset.dir = dir;
+      handle.addEventListener('mousedown', onResizeMouseDown);
+      doc.body.appendChild(handle);
+      resizeHandles.push(handle);
+    });
+    positionResizeHandles();
+  };
+  const removeResizeHandles = () => {
+    resizeHandles.forEach(h => h.removeEventListener('mousedown', onResizeMouseDown));
+    resizeHandles.forEach(h => h.remove());
+    resizeHandles = [];
+  };
+  const positionResizeHandles = () => {
+    if (!selectedComponent || resizeHandles.length === 0) return;
+    const rect = selectedComponent.getBoundingClientRect();
+    const scrollTop = win.pageYOffset || doc.documentElement.scrollTop;
+    const scrollLeft = win.pageXOffset || doc.documentElement.scrollLeft;
+    const positions: Record<string,[number,number]> = {
+      nw: [rect.left-5+scrollLeft, rect.top-5+scrollTop],
+      n:  [rect.left + rect.width/2 -5 +scrollLeft, rect.top-5+scrollTop],
+      ne: [rect.right-5+scrollLeft, rect.top-5+scrollTop],
+      e:  [rect.right-5+scrollLeft, rect.top + rect.height/2 -5 +scrollTop],
+      se: [rect.right-5+scrollLeft, rect.bottom-5+scrollTop],
+      s:  [rect.left + rect.width/2 -5 +scrollLeft, rect.bottom-5+scrollTop],
+      sw: [rect.left-5+scrollLeft, rect.bottom-5+scrollTop],
+      w:  [rect.left-5+scrollLeft, rect.top + rect.height/2 -5 +scrollTop]
+    };
+    resizeHandles.forEach(handle => {
+      const dir = handle.dataset.dir as string;
+      const [left, top] = positions[dir];
+      handle.style.left = `${left}px`;
+      handle.style.top = `${top}px`;
+    });
+  };
+  
+  const onResizeMouseDown = (e: any) => {
+    e.stopPropagation();
+    e.preventDefault();
+    const target = e.currentTarget as HTMLElement;
+    if (!selectedComponent) return;
+    isResizing = true;
+    activeHandleDir = target.dataset.dir || null;
+    resizeStartX = e.clientX;
+    resizeStartY = e.clientY;
+    const compStyle = win.getComputedStyle(selectedComponent);
+    startWidth = parseFloat(compStyle.width);
+    startHeight = parseFloat(compStyle.height);
+    startLeft = selectedComponent.offsetLeft;
+    startTop = selectedComponent.offsetTop;
+    doc.addEventListener('mousemove', onResizeMouseMove);
+    doc.addEventListener('mouseup', onResizeMouseUp);
+  };
+  const onResizeMouseMove = (e: any) => {
+    if (!isResizing || !selectedComponent || !activeHandleDir) return;
+    const dx = e.clientX - resizeStartX;
+    const dy = e.clientY - resizeStartY;
+    let newWidth = startWidth;
+    let newHeight = startHeight;
+    let newLeft = startLeft;
+    let newTop = startTop;
+    if (activeHandleDir.includes('e')) newWidth = Math.max(20, startWidth + dx);
+    if (activeHandleDir.includes('s')) newHeight = Math.max(20, startHeight + dy);
+    if (activeHandleDir.includes('w')) {
+      newWidth = Math.max(20, startWidth - dx);
+      newLeft = startLeft + dx;
+    }
+    if (activeHandleDir.includes('n')) {
+      newHeight = Math.max(20, startHeight - dy);
+      newTop = startTop + dy;
+    }
+    selectedComponent.style.width = `${newWidth}px`;
+    selectedComponent.style.height = `${newHeight}px`;
+    if (activeHandleDir.match(/[nw]|w|sw/)) {
+      selectedComponent.style.left = `${newLeft}px`;
+    }
+    if (activeHandleDir.match(/[nw]|n|ne/)) {
+      selectedComponent.style.top = `${newTop}px`;
+    }
+    positionResizeHandles();
+    positionToolbar();
+  };
+  const onResizeMouseUp = () => {
+    if (!isResizing) return;
+    isResizing = false;
+    activeHandleDir = null;
+    doc.removeEventListener('mousemove', onResizeMouseMove);
+    doc.removeEventListener('mouseup', onResizeMouseUp);
+  };
+  
+  // Modify selectComponent to include resize handles
   const selectComponent = (el: HTMLElement) => {
     if (selectedComponent === el && editToolbar && editToolbar.style.display !== 'none') return;
 
     if (selectedComponent) {
       selectedComponent.classList.remove('_component_selected');
+      removeResizeHandles();
     }
     selectedComponent = el;
     if (selectedComponent) {
         selectedComponent.classList.add('_component_selected');
         if (!editToolbar) createToolbar();
-        else editToolbar.style.display = 'flex'; // Ensure toolbar is visible
-
-        // Show/hide chart edit button
+        else {
+          editToolbar.style.display = 'flex';
+          editToolbar.style.visibility = 'visible';
+        }
         if (chartEditButton) {
             if (selectedComponent.tagName === 'CANVAS' && selectedComponent.id && win.Chart?.instances?.[selectedComponent.id]) {
                 chartEditButton.style.display = 'inline-block';
@@ -424,12 +556,19 @@ const _makeComponentsEditableInternal = (win: any, currentSlideIdx: number) => {
                 chartEditButton.style.display = 'none';
             }
         }
+        // Ensure selected element is positioned for resize if static
+        const compStyle = win.getComputedStyle(selectedComponent);
+        if (compStyle.position === 'static') {
+          selectedComponent.style.position = 'relative';
+        }
+        createResizeHandles();
         positionToolbar();
     } else {
         deselectComponent();
     }
   };
-
+  
+  // Extend deselectComponent to remove handles
   const deselectComponent = () => {
     if (selectedComponent) {
       selectedComponent.classList.remove('_component_selected');
@@ -437,87 +576,25 @@ const _makeComponentsEditableInternal = (win: any, currentSlideIdx: number) => {
     selectedComponent = null;
     if (editToolbar) {
       editToolbar.style.display = 'none';
+      editToolbar.style.visibility = 'hidden';
+      editToolbar.style.top = '-9999px';
+      editToolbar.style.left = '-9999px';
       if (chartEditButton) chartEditButton.style.display = 'none';
     }
     removeChartEditModal();
-  };
-
-  // Drag and drop handlers
-  const onDragMouseDown = (e: MouseEvent) => {
-    if (e.button !== 0) return; // Only left click
-    if (!selectedComponent || !selectedComponent.contains(e.target as Node) || (e.target as HTMLElement).closest('._component_edit_toolbar') || (e.target as HTMLElement).closest('._chart_edit_modal_overlay')) {
-        return; // Not on selected or on its toolbar or on chart modal
-    }
-
-    draggedElementRef = selectedComponent;
-    isDragging = false; // Will be set to true on first mousemove
-
-    const computedStyle = win.getComputedStyle(draggedElementRef);
-    if (computedStyle.position === 'static') {
-        draggedElementRef.style.position = 'relative';
-        // Initialize top/left if they are going to be used for relative positioning
-        draggedElementRef.style.top = draggedElementRef.style.top || '0px';
-        draggedElementRef.style.left = draggedElementRef.style.left || '0px';
-    } else {
-        // Ensure top/left are set if already positioned, fallback to 0px
-        draggedElementRef.style.top = computedStyle.top !== 'auto' ? computedStyle.top : (draggedElementRef.style.top || '0px');
-        draggedElementRef.style.left = computedStyle.left !== 'auto' ? computedStyle.left : (draggedElementRef.style.left || '0px');
-    }
-    
-    initialElemLeft = parseFloat(draggedElementRef.style.left);
-    initialElemTop = parseFloat(draggedElementRef.style.top);
-
-    // If parsing failed (e.g. 'auto'), default to 0
-    if (isNaN(initialElemLeft)) initialElemLeft = 0;
-    if (isNaN(initialElemTop)) initialElemTop = 0;
-
-    dragStartX = e.clientX;
-    dragStartY = e.clientY;
-
-    // Add listeners to document to capture mouse move anywhere
-    doc.addEventListener('mousemove', onDragMouseMove);
-    doc.addEventListener('mouseup', onDragMouseUp);
-  };
-
-  const onDragMouseMove = (e: MouseEvent) => {
-      if (!draggedElementRef) return;
-
-      if (!isDragging) {
-          // First significant move, consider it dragging
-          isDragging = true;
-          // Optionally, add a class to the body or element for visual feedback (e.g., grabbing cursor)
-          draggedElementRef.style.cursor = 'grabbing';
-          // Higher z-index while dragging
-          draggedElementRef.style.zIndex = '100002'; 
-      }
-      e.preventDefault(); // Prevent text selection or other default behaviors
-
-      const dx = e.clientX - dragStartX;
-      const dy = e.clientY - dragStartY;
-
-      draggedElementRef.style.left = `${initialElemLeft + dx}px`;
-      draggedElementRef.style.top = `${initialElemTop + dy}px`;
-
-      positionToolbar(); // Keep toolbar positioned relative to the moving element
-  };
-
-  const onDragMouseUp = () => {
-      if (draggedElementRef && isDragging) {
-          // Reset cursor and z-index
-          draggedElementRef.style.cursor = ''; 
-          draggedElementRef.style.zIndex = ''; 
-      }
-
-      // Remove listeners from document
-      doc.removeEventListener('mousemove', onDragMouseMove);
-      doc.removeEventListener('mouseup', onDragMouseUp);
-
-      isDragging = false;
-      draggedElementRef = null;
+    removeResizeHandles();
   };
   
-  addTrackedListener(doc, 'mousedown', onDragMouseDown, true);
-
+  // Update resize handles on scroll/resize
+  const scrollOrResizeHandler = (evt: any) => {
+      if(selectedComponent) {
+        positionToolbar();
+        positionResizeHandles();
+      }
+      if(chartEditModal && selectedComponent?.tagName === 'CANVAS' && win.Chart?.instances?.[selectedComponent.id]) {
+        // Could reposition modal
+      }
+  };
 
   const componentSelector = 'div,p,span,h1,h2,h3,h4,h5,h6,li,a,img,table,ul,ol,section,article,aside,header,footer,figure,canvas,button,input,textarea,select';
   const elements = doc.body.querySelectorAll(componentSelector);
@@ -531,7 +608,7 @@ const _makeComponentsEditableInternal = (win: any, currentSlideIdx: number) => {
     if (rect.width < 10 && rect.height < 10 && htmlEl.children.length === 0 && !['IMG', 'CANVAS', 'INPUT', 'BUTTON'].includes(htmlEl.tagName)) return;
 
     htmlEl.classList.add('_component_interactive');
-    const clickHandler = function(event: MouseEvent) {
+    const clickHandler = function(event: any) {
       event.preventDefault();
       event.stopPropagation();
       if (selectedComponent === htmlEl) {
@@ -544,7 +621,7 @@ const _makeComponentsEditableInternal = (win: any, currentSlideIdx: number) => {
     addTrackedListener(htmlEl, 'click', clickHandler);
   });
   
-  const bodyClickHandler = function(event: MouseEvent) {
+  const bodyClickHandler = function(event: any) {
     if (isDragging) return; // Don't deselect if a drag operation just finished on the body
     // If clicked outside selected component and its toolbar, and not inside the chart modal
     if (selectedComponent && editToolbar && !editToolbar.contains(event.target as Node) && !selectedComponent.contains(event.target as Node) && (!chartEditModal || !chartEditModal.contains(event.target as Node))) {
@@ -554,12 +631,6 @@ const _makeComponentsEditableInternal = (win: any, currentSlideIdx: number) => {
   addTrackedListener(doc.body, 'click', bodyClickHandler);
   
   // Reposition toolbar on scroll or resize
-  const scrollOrResizeHandler = () => {
-      if(selectedComponent) positionToolbar();
-      if(chartEditModal && selectedComponent?.tagName === 'CANVAS' && win.Chart?.instances?.[selectedComponent.id]) {
-        // If chart modal is open, could consider repositioning if it's not centered overlay
-      }
-  };
   addTrackedListener(win, 'resize', scrollOrResizeHandler);
   addTrackedListener(win, 'scroll', scrollOrResizeHandler, true); // Use capture for scroll
 
@@ -581,7 +652,7 @@ const _makeComponentsEditableInternal = (win: any, currentSlideIdx: number) => {
 
     removeChartEditModal();
     if (editToolbar) editToolbar.remove();
-    doc.querySelectorAll('._component_interactive').forEach(el => el.classList.remove('_component_interactive', '_component_selected'));
+    doc.querySelectorAll('._component_interactive').forEach((el: Element) => (el as HTMLElement).classList.remove('_component_interactive', '_component_selected'));
     const styleElement = doc.getElementById(styleId);
     if (styleElement) styleElement.remove();
     selectedComponent = null;
@@ -589,6 +660,72 @@ const _makeComponentsEditableInternal = (win: any, currentSlideIdx: number) => {
     chartEditButton = null;
     delete win._cleanupComponentEditMode;
   };
+
+  // Drag and drop handlers (re-added)
+  const onDragMouseDown = (e: any) => {
+    if (e.button !== 0) return; // left click only
+    if (!selectedComponent) return;
+    const target = e.target as HTMLElement;
+    // Ignore if clicking on resize handle or toolbar or modal
+    if (target.closest('._component_edit_toolbar') || target.classList.contains(REMOVE_CLASS) || target.closest('._chart_edit_modal_overlay')) return;
+    if (!selectedComponent.contains(target)) return; // click outside selected component
+
+    draggedElementRef = selectedComponent;
+    isDragging = false; // will set true on first move
+
+    const computed = win.getComputedStyle(draggedElementRef);
+    if (computed.position === 'static') {
+      draggedElementRef.style.position = 'relative';
+      draggedElementRef.style.top = draggedElementRef.style.top || '0px';
+      draggedElementRef.style.left = draggedElementRef.style.left || '0px';
+    } else {
+      draggedElementRef.style.top = computed.top !== 'auto' ? computed.top : (draggedElementRef.style.top || '0px');
+      draggedElementRef.style.left = computed.left !== 'auto' ? computed.left : (draggedElementRef.style.left || '0px');
+    }
+
+    initialElemLeft = parseFloat(draggedElementRef.style.left);
+    initialElemTop = parseFloat(draggedElementRef.style.top);
+    if (isNaN(initialElemLeft)) initialElemLeft = 0;
+    if (isNaN(initialElemTop)) initialElemTop = 0;
+
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+
+    doc.addEventListener('mousemove', onDragMouseMove);
+    doc.addEventListener('mouseup', onDragMouseUp);
+  };
+
+  const onDragMouseMove = (e: any) => {
+    if (!draggedElementRef) return;
+    // Skip if currently resizing
+    if (isResizing) return;
+    if (!isDragging) {
+      isDragging = true;
+      draggedElementRef.style.cursor = 'grabbing';
+      draggedElementRef.style.zIndex = '100002';
+    }
+    e.preventDefault();
+    const dx = e.clientX - dragStartX;
+    const dy = e.clientY - dragStartY;
+    draggedElementRef.style.left = `${initialElemLeft + dx}px`;
+    draggedElementRef.style.top = `${initialElemTop + dy}px`;
+    positionToolbar();
+    positionResizeHandles();
+  };
+
+  const onDragMouseUp = () => {
+    if (draggedElementRef && isDragging) {
+      draggedElementRef.style.cursor = '';
+      draggedElementRef.style.zIndex = '';
+    }
+    doc.removeEventListener('mousemove', onDragMouseMove);
+    doc.removeEventListener('mouseup', onDragMouseUp);
+    isDragging = false;
+    draggedElementRef = null;
+  };
+
+  // Register mousedown listener on document (capture phase) to start drag
+  addTrackedListener(doc, 'mousedown', onDragMouseDown, true);
 };
 
 // Unified save and cleanup function (internal, unchanged)
@@ -615,6 +752,11 @@ const _saveAndDisableAllEditsInternal = (win: any) => {
       doc.querySelectorAll('[style*="--component-scale"]').forEach((el: HTMLElement) => {
         // el.style.removeProperty('--component-scale'); // Example cleanup
       });
+
+      // Remove any lingering component edit toolbars just in case
+      doc.querySelectorAll('._component_edit_toolbar').forEach((el: Element) => (el as HTMLElement).remove());
+      // Remove lingering chart edit modal overlay as well
+      doc.querySelectorAll('._chart_edit_modal_overlay').forEach((el: Element) => (el as HTMLElement).remove());
 
       const updatedHtml = doc.documentElement.outerHTML;
       const slideIndex = win.currentSlideIndexForEdit;
